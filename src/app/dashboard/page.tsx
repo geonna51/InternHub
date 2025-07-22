@@ -1,0 +1,1026 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import DatePicker from 'react-datepicker';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { createClient } from '../../lib/supabase/client';
+import { useRouter } from 'next/navigation';
+import type { Database } from '../../lib/database.types';
+
+// Use database types
+type Application = Database['public']['Tables']['applications']['Row'] & {
+  reminders?: Database['public']['Tables']['reminders']['Row'][];
+};
+type Profile = Database['public']['Tables']['profiles']['Row'];
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  
+  // User state
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Form state
+  const [company, setCompany] = useState('');
+  const [date, setDate] = useState<Date | null>(null);
+  const [referral, setReferral] = useState<boolean>(false);
+  const [referredBy, setReferredBy] = useState('');
+  const [applicationLink, setApplicationLink] = useState('');
+  
+  // App state
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [activeTab, setActiveTab] = useState<'add' | 'list' | 'analytics'>('add');
+  const [selectedApps, setSelectedApps] = useState<number[]>([]);
+  const [showReminderPanel, setShowReminderPanel] = useState(false);
+  const [showStatusPanel, setShowStatusPanel] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState({
+    email: '',
+    reminderEmail: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  const statusOptions = [
+    { value: 'applied', label: 'Applied', color: 'bg-blue-500' },
+    { value: 'under-review', label: 'Under Review', color: 'bg-yellow-500' },
+    { value: 'online-assessment', label: 'Online Assessment', color: 'bg-purple-500' },
+    { value: 'phone-screen', label: 'Phone Screen', color: 'bg-indigo-500' },
+    { value: 'technical-interview', label: 'Technical Interview', color: 'bg-cyan-500' },
+    { value: 'final-interview', label: 'Final Interview', color: 'bg-orange-500' },
+    { value: 'offer', label: 'Offer Received', color: 'bg-green-500' },
+    { value: 'rejected', label: 'Rejected', color: 'bg-red-500' },
+    { value: 'withdrawn', label: 'Withdrawn', color: 'bg-gray-500' },
+  ] as const;
+
+  // Load user and data on mount
+  useEffect(() => {
+    loadUserAndData();
+  }, []);
+
+  const loadUserAndData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      
+      setUser(user);
+      
+      // Load profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileData) {
+        setProfile(profileData);
+        setSettings({
+          email: profileData.email,
+          reminderEmail: profileData.reminder_email || '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      }
+      
+      // Load applications
+      await loadApplications(user.id);
+      
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadApplications = async (userId: string) => {
+    const { data: applicationsData, error } = await supabase
+      .from('applications')
+      .select(`
+        *,
+        reminders(*)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error loading applications:', error);
+    } else {
+      setApplications(applicationsData || []);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('applications')
+        .insert({
+          user_id: user.id,
+          company,
+          application_date: date?.toISOString().split('T')[0] || null,
+          referral,
+          referred_by: referredBy || null,
+          application_link: applicationLink || null,
+          status: 'applied',
+          notes: ''
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating application:', error);
+        return;
+      }
+
+      // Reload applications
+      await loadApplications(user.id);
+      
+      // Reset form
+      setCompany('');
+      setDate(null);
+      setReferral(false);
+      setReferredBy('');
+      setApplicationLink('');
+      setActiveTab('list');
+    } catch (error) {
+      console.error('Error submitting application:', error);
+    }
+  };
+
+  const toggleAppSelection = (index: number) => {
+    setSelectedApps(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
+
+  const selectAllApps = () => {
+    setSelectedApps(applications.map((_, i) => i));
+  };
+
+  const clearSelection = () => {
+    setSelectedApps([]);
+  };
+
+  const setReminderForSelected = async (timeOption: string, customDate?: Date) => {
+    if (!user) return;
+    
+    const now = new Date();
+    let reminderDate: Date;
+
+    switch (timeOption) {
+      case '1week':
+        reminderDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '2weeks':
+        reminderDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+        break;
+      case '3weeks':
+        reminderDate = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+        break;
+      case '1month':
+        reminderDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+        break;
+      case '2months':
+        reminderDate = new Date(now.getFullYear(), now.getMonth() + 2, now.getDate());
+        break;
+      case 'custom':
+        reminderDate = customDate || now;
+        break;
+      default:
+        return;
+    }
+
+    try {
+      // Create reminders for selected applications
+      const remindersToCreate = selectedApps.map(index => ({
+        user_id: user.id,
+        application_id: applications[index].id,
+        reminder_date: reminderDate.toISOString()
+      }));
+
+      const { error } = await supabase
+        .from('reminders')
+        .insert(remindersToCreate);
+
+      if (error) {
+        console.error('Error creating reminders:', error);
+        return;
+      }
+
+      // Reload applications to show new reminders
+      await loadApplications(user.id);
+    } catch (error) {
+      console.error('Error setting reminders:', error);
+    }
+
+    setSelectedApps([]);
+    setShowReminderPanel(false);
+  };
+
+  const updateStatusForSelected = async (newStatus: Application['status']) => {
+    if (!user) return;
+    
+    try {
+      const applicationsToUpdate = selectedApps.map(index => applications[index].id);
+      
+      const { error } = await supabase
+        .from('applications')
+        .update({ status: newStatus })
+        .in('id', applicationsToUpdate);
+
+      if (error) {
+        console.error('Error updating status:', error);
+        return;
+      }
+
+      // Reload applications
+      await loadApplications(user.id);
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+    
+    setSelectedApps([]);
+    setShowStatusPanel(false);
+  };
+
+  const getStatusInfo = (status: string) => {
+    return statusOptions.find(option => option.value === status) || statusOptions[0];
+  };
+
+  const handleSettingsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) return;
+    
+    try {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          email: settings.email,
+          reminder_email: settings.reminderEmail || null
+        })
+        .eq('id', user.id);
+
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+        return;
+      }
+
+      // Update password if provided
+      if (settings.newPassword && settings.newPassword === settings.confirmPassword) {
+        const { error: passwordError } = await supabase.auth.updateUser({
+          password: settings.newPassword
+        });
+
+        if (passwordError) {
+          console.error('Error updating password:', passwordError);
+          return;
+        }
+      }
+
+      // Reload profile
+      await loadUserAndData();
+    } catch (error) {
+      console.error('Error updating settings:', error);
+    }
+    
+    setShowSettings(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
+  const testReminders = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('test-reminder')
+      if (error) {
+        console.error('Error testing reminders:', error)
+      } else {
+        console.log('Test reminder result:', data)
+        alert('Test reminder sent! Check console for details.')
+      }
+    } catch (error) {
+      console.error('Error invoking test reminder:', error)
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Analytics data preparation
+  const getStatusCounts = () => {
+    const counts = statusOptions.map(status => ({
+      name: status.label,
+      value: applications.filter(app => app.status === status.value).length,
+      color: status.color.replace('bg-', '#').replace('-500', ''),
+    }));
+    return counts.filter(item => item.value > 0);
+  };
+
+  const getMonthlyApplications = () => {
+    const monthCounts: { [key: string]: number } = {};
+    applications.forEach(app => {
+      if (app.application_date) {
+        const month = app.application_date.split('-')[1]; // YYYY-MM-DD -> MM
+        monthCounts[month] = (monthCounts[month] || 0) + 1;
+      }
+    });
+    return Object.entries(monthCounts).map(([month, count]) => ({ month, count }));
+  };
+
+  const getSankeyData = () => {
+    // Create flow data for Sankey diagram
+    const flows = [
+      { from: 'Total Applications', to: 'Applied', value: applications.length },
+    ];
+    
+    const statusCounts = applications.reduce((acc, app) => {
+      acc[app.status] = (acc[app.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Add flows from Applied to other statuses
+    Object.entries(statusCounts).forEach(([status, count]) => {
+      if (status !== 'applied') {
+        const statusInfo = statusOptions.find(s => s.value === status);
+        if (statusInfo) {
+          flows.push({ from: 'Applied', to: statusInfo.label, value: count });
+        }
+      }
+    });
+
+    return flows;
+  };
+
+  const renderSankeyDiagram = () => {
+    const flows = getSankeyData();
+    const totalApps = applications.length;
+    
+    if (totalApps === 0) {
+      return (
+        <div className="text-center py-12 text-gray-400">
+          <p>Add some applications to see the flow diagram</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-gray-800 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Application Flow</h3>
+        <div className="space-y-4">
+          {flows.map((flow, idx) => (
+            <div key={idx} className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                  {flow.from}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-0.5 bg-gray-600"></div>
+                  <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="bg-green-600 text-white px-3 py-1 rounded text-sm">
+                  {flow.to}
+                </div>
+              </div>
+              <div className="text-gray-300 font-semibold">
+                {flow.value} ({Math.round((flow.value / totalApps) * 100)}%)
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen px-6 py-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
+              Dashboard
+            </h1>
+            <p className="text-gray-400">Welcome back, {profile?.email}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={testReminders}
+              className="px-3 py-1 text-sm text-yellow-400 hover:text-yellow-300 transition-colors"
+              title="Test Reminders"
+            >
+              Test Email
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-gray-400 hover:text-gray-300 transition-colors"
+              title="Settings"
+            >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1 text-sm text-red-400 hover:text-red-300 transition-colors"
+              title="Logout"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="mb-8">
+          <nav className="flex space-x-8 border-b border-gray-700">
+            <button
+              type="button"
+              onClick={() => setActiveTab('add')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'add'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Add Application
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('list')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'list'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              My Applications ({applications.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('analytics')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'analytics'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Analytics
+            </button>
+          </nav>
+        </div>
+
+        {/* Content */}
+        {activeTab === 'add' ? (
+          <div className="max-w-2xl mx-auto">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="company" className="block text-sm font-medium text-gray-300 mb-2">
+                  Company Name
+                </label>
+                <input
+                  id="company"
+                  type="text"
+                  placeholder="Enter company name"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
+                  Application Date
+                </label>
+                <DatePicker
+                  selected={date}
+                  onChange={(date) => setDate(date)}
+                  dateFormat="MM/dd/yyyy"
+                  placeholderText="Select application date"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Referral Received?
+                </label>
+                <select
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={referral.toString()}
+                  onChange={(e) => setReferral(e.target.value === 'true')}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+
+              {referral && (
+                <div>
+                  <label htmlFor="referredBy" className="block text-sm font-medium text-gray-300 mb-2">
+                    Referred By
+                  </label>
+                  <input
+                    id="referredBy"
+                    type="text"
+                    placeholder="Who referred you?"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={referredBy}
+                    onChange={(e) => setReferredBy(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="applicationLink" className="block text-sm font-medium text-gray-300 mb-2">
+                  Application Link <span className="text-gray-500">(optional)</span>
+                </label>
+                <input
+                  id="applicationLink"
+                  type="url"
+                  placeholder="https://company.com/careers/job-id"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={applicationLink}
+                  onChange={(e) => setApplicationLink(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Add Application
+              </button>
+            </form>
+          </div>
+        ) : activeTab === 'list' ? (
+          <div>
+            {applications.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-300 mb-2">No applications yet</h3>
+                <p className="text-gray-400 mb-4">Get started by adding your first internship application.</p>
+                <button
+                  onClick={() => setActiveTab('add')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Add Your First Application
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Bulk Actions Bar */}
+                {applications.length > 0 && (
+                  <div className="md:col-span-2 lg:col-span-3 bg-gray-800 border border-gray-700 rounded-lg p-4 mb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-gray-400">
+                          {selectedApps.length} of {applications.length} selected
+                        </span>
+                        <button
+                          onClick={selectAllApps}
+                          className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={clearSelection}
+                          className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      {selectedApps.length > 0 && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowStatusPanel(!showStatusPanel)}
+                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            Update Status ({selectedApps.length})
+                          </button>
+                          <button
+                            onClick={() => setShowReminderPanel(!showReminderPanel)}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Set Reminders ({selectedApps.length})
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Status Update Panel */}
+                    {showStatusPanel && (
+                      <div className="mt-4 pt-4 border-t border-gray-600">
+                        <h4 className="text-sm font-medium text-gray-300 mb-3">Update status for selected applications:</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {statusOptions.map((status) => (
+                            <button
+                              key={status.value}
+                              onClick={() => updateStatusForSelected(status.value)}
+                              className={`px-3 py-2 text-xs text-white rounded transition-opacity hover:opacity-80 ${status.color}`}
+                            >
+                              {status.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Reminder Options Panel */}
+                    {showReminderPanel && (
+                      <div className="mt-4 pt-4 border-t border-gray-600">
+                        <h4 className="text-sm font-medium text-gray-300 mb-3">Set reminder for selected applications:</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+                          <button
+                            onClick={() => setReminderForSelected('1week')}
+                            className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                          >
+                            1 Week
+                          </button>
+                          <button
+                            onClick={() => setReminderForSelected('2weeks')}
+                            className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                          >
+                            2 Weeks
+                          </button>
+                          <button
+                            onClick={() => setReminderForSelected('3weeks')}
+                            className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                          >
+                            3 Weeks
+                          </button>
+                          <button
+                            onClick={() => setReminderForSelected('1month')}
+                            className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                          >
+                            1 Month
+                          </button>
+                          <button
+                            onClick={() => setReminderForSelected('2months')}
+                            className="px-3 py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                          >
+                            2 Months
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DatePicker
+                            selected={null}
+                            onChange={(date) => date && setReminderForSelected('custom', date)}
+                            placeholderText="Or pick custom date"
+                            className="px-3 py-2 text-xs bg-gray-700 border border-gray-600 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            minDate={new Date()}
+                            showTimeSelect
+                            dateFormat="MM/dd/yyyy h:mm aa"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {applications.map((app, idx) => (
+                   <div 
+                     key={idx} 
+                     className={`bg-gray-800 border rounded-lg p-6 cursor-pointer transition-all ${
+                       selectedApps.includes(idx) 
+                         ? 'border-blue-500 bg-gray-750' 
+                         : 'border-gray-700 hover:border-gray-600'
+                     }`}
+                     onClick={() => toggleAppSelection(idx)}
+                   >
+                     <div className="flex items-start justify-between mb-4">
+                       <div className="flex items-center gap-3">
+                         <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                           selectedApps.includes(idx) 
+                             ? 'bg-blue-600 border-blue-600' 
+                             : 'border-gray-500'
+                         }`}>
+                           {selectedApps.includes(idx) && (
+                             <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                             </svg>
+                           )}
+                         </div>
+                         <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                             <h3 className="text-lg font-semibold text-white">{app.company}</h3>
+                             {app.application_link && (
+                               <a
+                                 href={app.application_link}
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 className="text-blue-400 hover:text-blue-300 transition-colors"
+                                 onClick={(e) => e.stopPropagation()}
+                               >
+                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                 </svg>
+                               </a>
+                             )}
+                           </div>
+                           <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white ${getStatusInfo(app.status).color}`}>
+                             {getStatusInfo(app.status).label}
+                           </div>
+                         </div>
+                       </div>
+                       <span className="text-xs text-gray-400">
+                         #{idx + 1}
+                       </span>
+                     </div>
+                     <div className="space-y-2 text-sm">
+                       <div className="flex justify-between">
+                         <span className="text-gray-400">Date:</span>
+                         <span className="text-gray-300">{app.application_date || 'Not set'}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-gray-400">Referral:</span>
+                         <span className={`font-medium ${app.referral ? 'text-green-400' : 'text-gray-300'}`}>
+                           {app.referral ? 'Yes' : 'No'}
+                         </span>
+                       </div>
+                       {app.referral && app.referred_by && (
+                         <div className="flex justify-between">
+                           <span className="text-gray-400">Referred by:</span>
+                           <span className="text-gray-300">{app.referred_by}</span>
+                         </div>
+                       )}
+                       {app.reminders && app.reminders.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-700">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-400">Reminders:</span>
+                            </div>
+                            {app.reminders.map((reminder, rIdx) => (
+                              <div key={rIdx} className="flex items-center justify-between mt-1">
+                                <span className={`text-xs ${reminder.email_sent ? 'text-green-400' : 'text-yellow-400'}`}>
+                                  {new Date(reminder.reminder_date).toLocaleDateString()} {new Date(reminder.reminder_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </span>
+                                <span className={`text-xs px-2 py-0.5 rounded ${reminder.email_sent ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'}`}>
+                                  {reminder.email_sent ? 'Sent' : 'Pending'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                     </div>
+                   </div>
+                  ))}
+               </div>
+            )}
+          </div>
+        ) : (
+          /* Analytics Tab */
+          <div className="space-y-8">
+            {applications.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-300 mb-2">No data to analyze yet</h3>
+                <p className="text-gray-400 mb-4">Add some applications to see your analytics and insights.</p>
+                <button
+                  onClick={() => setActiveTab('add')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Add Your First Application
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-8 lg:grid-cols-2">
+                {/* Application Flow Sankey */}
+                <div className="lg:col-span-2">
+                  {renderSankeyDiagram()}
+                </div>
+                
+                {/* Status Distribution */}
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Status Distribution</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={getStatusCounts()}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label
+                        >
+                          {getStatusCounts().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Monthly Applications */}
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Applications Over Time</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={getMonthlyApplications()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis dataKey="month" stroke="#9CA3AF" />
+                        <YAxis stroke="#9CA3AF" />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#1F2937', 
+                            border: '1px solid #374151',
+                            borderRadius: '8px'
+                          }}
+                        />
+                        <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gray-800 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-blue-400">{applications.length}</div>
+                    <div className="text-sm text-gray-400">Total Applications</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-green-400">
+                      {applications.filter(app => app.status === 'offer').length}
+                    </div>
+                    <div className="text-sm text-gray-400">Offers Received</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-yellow-400">
+                      {applications.filter(app => ['under-review', 'online-assessment', 'phone-screen', 'technical-interview', 'final-interview'].includes(app.status)).length}
+                    </div>
+                    <div className="text-sm text-gray-400">In Progress</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-purple-400">
+                      {applications.filter(app => app.referral).length}
+                    </div>
+                    <div className="text-sm text-gray-400">With Referrals</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-12 pt-8 border-t border-gray-700">
+          <Link href="/" className="text-sm text-gray-400 hover:text-gray-300 transition-colors">
+            ← Back to Home
+          </Link>
+        </div>
+      </div>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white">Settings</h2>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="text-gray-400 hover:text-gray-300 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={handleSettingsSubmit} className="space-y-6">
+                {/* Account Settings */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Account Settings</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                        Email Address
+                      </label>
+                      <input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={settings.email}
+                        onChange={(e) => setSettings(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="reminderEmail" className="block text-sm font-medium text-gray-300 mb-2">
+                        Reminder Email Address
+                      </label>
+                      <input
+                        id="reminderEmail"
+                        type="email"
+                        placeholder="reminders@email.com (optional)"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={settings.reminderEmail}
+                        onChange={(e) => setSettings(prev => ({ ...prev, reminderEmail: e.target.value }))}
+                      />
+                      <p className="mt-1 text-xs text-gray-400">
+                        Leave blank to use your main email for reminders
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Password Settings */}
+                <div className="border-t border-gray-600 pt-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Change Password</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="newPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                        New Password
+                      </label>
+                      <input
+                        id="newPassword"
+                        type="password"
+                        placeholder="Enter new password"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={settings.newPassword}
+                        onChange={(e) => setSettings(prev => ({ ...prev, newPassword: e.target.value }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                        Confirm New Password
+                      </label>
+                      <input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder="Confirm new password"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={settings.confirmPassword}
+                        onChange={(e) => setSettings(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      />
+                      {settings.newPassword && settings.confirmPassword && settings.newPassword !== settings.confirmPassword && (
+                        <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowSettings(false)}
+                    className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
