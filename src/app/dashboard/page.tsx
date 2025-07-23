@@ -894,72 +894,90 @@ export default function DashboardPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid gap-8 lg:grid-cols-2">
+              <div className="space-y-8">
                 {/* Application Pipeline Overview */}
-                <div className="lg:col-span-2">
-                  <div className="bg-gray-800 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-white mb-6">Application Pipeline</h3>
-                    
-                    {/* Pipeline stages */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
-                      {[
-                        { key: 'applied', label: 'Applied', color: '#3B82F6', icon: '📝' },
-                        { key: 'under-review', label: 'Under Review', color: '#EAB308', icon: '👀' },
-                        { key: 'online-assessment', label: 'Assessment', color: '#A855F7', icon: '💻' },
-                        { key: 'phone-screen', label: 'Phone Screen', color: '#6366F1', icon: '📞' },
-                        { key: 'technical-interview', label: 'Technical', color: '#06B6D4', icon: '🧑‍💻' },
-                        { key: 'final-interview', label: 'Final Round', color: '#F97316', icon: '🎯' },
-                        { key: 'offer', label: 'Offer', color: '#10B981', icon: '🎉' },
-                        { key: 'rejected', label: 'Rejected', color: '#EF4444', icon: '❌' },
-                        { key: 'withdrawn', label: 'Withdrawn', color: '#6B7280', icon: '↩️' }
-                      ].map((stage) => {
-                        const count = applications.filter(app => app.status === stage.key).length;
-                        const percentage = applications.length > 0 ? Math.round((count / applications.length) * 100) : 0;
-                        
-                        if (count === 0) return null;
-                        
-                        return (
-                          <div key={stage.key} className="text-center">
-                            <div 
-                              className="w-16 h-16 mx-auto rounded-lg flex items-center justify-center text-white font-bold text-lg mb-2"
-                              style={{ backgroundColor: stage.color }}
-                            >
-                              <span className="text-xl">{stage.icon}</span>
-                            </div>
-                            <div className="text-white font-semibold text-lg">{count}</div>
-                            <div className="text-xs text-gray-400 mb-1">{stage.label}</div>
-                            <div className="text-xs text-gray-500">{percentage}%</div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-white mb-6">Application Pipeline</h3>
+                  
+                  {/* Pipeline stages */}
+                  {(() => {
+                    const allStages = [
+                      { key: 'applied', label: 'Applied', color: '#3B82F6', icon: '📝' },
+                      { key: 'under-review', label: 'Under Review', color: '#EAB308', icon: '👀' },
+                      { key: 'online-assessment', label: 'Assessment', color: '#A855F7', icon: '💻' },
+                      { key: 'phone-screen', label: 'Phone Screen', color: '#6366F1', icon: '📞' },
+                      { key: 'technical-interview', label: 'Technical', color: '#06B6D4', icon: '🧑‍💻' },
+                      { key: 'final-interview', label: 'Final Round', color: '#F97316', icon: '🎯' },
+                      { key: 'offer', label: 'Offer', color: '#10B981', icon: '🎉' },
+                      { key: 'rejected', label: 'Rejected', color: '#EF4444', icon: '❌' },
+                      { key: 'withdrawn', label: 'Withdrawn', color: '#6B7280', icon: '↩️' }
+                    ];
 
-                    {/* Quick stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-700">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-400">
-                          {Math.round((applications.filter(app => app.status === 'offer').length / Math.max(applications.length, 1)) * 100)}%
-                        </div>
-                        <div className="text-sm text-gray-400">Success Rate</div>
+                    // Filter to only stages that have applications
+                    const activeStages = allStages.filter(stage => {
+                      return applications.filter(app => app.status === stage.key).length > 0;
+                    });
+
+                    // Determine dynamic grid classes based on number of active stages
+                    const getGridCols = (count: number) => {
+                      if (count === 1) return 'grid-cols-1';
+                      if (count === 2) return 'grid-cols-2';
+                      if (count === 3) return 'grid-cols-3';
+                      if (count === 4) return 'grid-cols-2 md:grid-cols-4';
+                      if (count === 5) return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5';
+                      if (count === 6) return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6';
+                      return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5';
+                    };
+
+                    return (
+                      <div className={`grid ${getGridCols(activeStages.length)} gap-4 mb-6`}>
+                        {activeStages.map((stage) => {
+                          const count = applications.filter(app => app.status === stage.key).length;
+                          const percentage = applications.length > 0 ? Math.round((count / applications.length) * 100) : 0;
+                          
+                          return (
+                            <div key={stage.key} className="text-center">
+                              <div 
+                                className="w-16 h-16 mx-auto rounded-lg flex items-center justify-center text-white font-bold text-lg mb-2"
+                                style={{ backgroundColor: stage.color }}
+                              >
+                                <span className="text-xl">{stage.icon}</span>
+                              </div>
+                              <div className="text-white font-semibold text-lg">{count}</div>
+                              <div className="text-xs text-gray-400 mb-1">{stage.label}</div>
+                              <div className="text-xs text-gray-500">{percentage}%</div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-400">
-                          {Math.round((applications.filter(app => ['technical-interview', 'final-interview'].includes(app.status)).length / Math.max(applications.length, 1)) * 100)}%
-                        </div>
-                        <div className="text-sm text-gray-400">Interview Rate</div>
+                    );
+                  })()}
+
+                  {/* Quick stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-700">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-400">
+                        {Math.round((applications.filter(app => app.status === 'offer').length / Math.max(applications.length, 1)) * 100)}%
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-purple-400">
-                          {Math.round((applications.filter(app => ['online-assessment', 'phone-screen'].includes(app.status)).length / Math.max(applications.length, 1)) * 100)}%
-                        </div>
-                        <div className="text-sm text-gray-400">Assessment Rate</div>
+                      <div className="text-sm text-gray-400">Success Rate</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {Math.round((applications.filter(app => ['technical-interview', 'final-interview'].includes(app.status)).length / Math.max(applications.length, 1)) * 100)}%
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-400">
-                          {Math.round((applications.filter(app => app.status === 'rejected').length / Math.max(applications.length, 1)) * 100)}%
-                        </div>
-                        <div className="text-sm text-gray-400">Rejection Rate</div>
+                      <div className="text-sm text-gray-400">Interview Rate</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-400">
+                        {Math.round((applications.filter(app => ['online-assessment', 'phone-screen'].includes(app.status)).length / Math.max(applications.length, 1)) * 100)}%
                       </div>
+                      <div className="text-sm text-gray-400">Assessment Rate</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-400">
+                        {Math.round((applications.filter(app => app.status === 'rejected').length / Math.max(applications.length, 1)) * 100)}%
+                      </div>
+                      <div className="text-sm text-gray-400">Rejection Rate</div>
                     </div>
                   </div>
                 </div>
@@ -1007,69 +1025,6 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                {/* Success Metrics */}
-                <div className="bg-gray-800 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Success Metrics</h3>
-                  <div className="space-y-6">
-                    {/* Key metrics */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-gray-700/50 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-green-400">
-                          {applications.filter(app => app.status === 'offer').length}
-                        </div>
-                        <div className="text-sm text-gray-400">Offers Received</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {applications.length > 0 ? 
-                            Math.round((applications.filter(app => app.status === 'offer').length / applications.length) * 100) : 0}% success rate
-                        </div>
-                      </div>
-                      <div className="bg-gray-700/50 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-blue-400">
-                          {applications.filter(app => 
-                            ['technical-interview', 'final-interview'].includes(app.status)
-                          ).length}
-                        </div>
-                        <div className="text-sm text-gray-400">In Interviews</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {applications.length > 0 ? 
-                            Math.round((applications.filter(app => 
-                              ['technical-interview', 'final-interview'].includes(app.status)
-                            ).length / applications.length) * 100) : 0}% interview rate
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Progress breakdown */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-gray-300">Application Progress</h4>
-                      {[
-                        { label: 'Early Stage', statuses: ['applied', 'under-review'], color: '#3B82F6' },
-                        { label: 'Assessments', statuses: ['online-assessment', 'phone-screen'], color: '#A855F7' },
-                        { label: 'Interviews', statuses: ['technical-interview', 'final-interview'], color: '#F97316' },
-                        { label: 'Final Outcomes', statuses: ['offer', 'rejected', 'withdrawn'], color: '#6B7280' }
-                      ].map((category, idx) => {
-                        const count = applications.filter(app => category.statuses.includes(app.status)).length;
-                        const percentage = applications.length > 0 ? (count / applications.length) * 100 : 0;
-                        return (
-                          <div key={idx} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div 
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: category.color }}
-                              ></div>
-                              <span className="text-sm text-gray-300">{category.label}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="text-sm text-white font-medium">{count}</div>
-                              <div className="text-xs text-gray-400">({Math.round(percentage)}%)</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </div>
                 </div>
 
