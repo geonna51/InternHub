@@ -1,12 +1,37 @@
 # InternHub
 
-All your internship applications, one organized hub.
+A modern application tracking system for students managing their internship search. Stay organized, track your progress, and never miss a follow-up.
 
-## Setup Instructions
+![InternHub Preview](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=InternHub+Preview)
 
-### 1. Environment Variables
+## Features
 
-Create a `.env.local` file in the root directory with:
+- **Application Tracking**: Organize all your applications with status updates and notes
+- **Analytics Dashboard**: Visualize your progress with interactive charts and metrics
+- **Email Reminders**: Automated follow-up reminders for applications
+- **Bulk Operations**: Update multiple applications and set reminders efficiently
+- **Modern UI**: Clean, responsive design with glassmorphism effects
+- **Secure**: User authentication and data protection with Supabase
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ 
+- A Supabase account
+- A Resend account (for email features)
+
+### 1. Clone and Install
+
+```bash
+git clone https://github.com/yourusername/internhub.git
+cd internhub
+npm install
+```
+
+### 2. Environment Setup
+
+Create `.env.local`:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
@@ -14,152 +39,100 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### 2. Database Setup
+### 3. Database Setup
 
-#### Option A: Using Supabase CLI (Recommended)
-
-1. Install Supabase CLI:
-   ```bash
-   npm install -g supabase
-   ```
-
-2. Login to Supabase:
-   ```bash
-   supabase login
-   ```
-
-3. Initialize Supabase in your project:
-   ```bash
-   supabase init
-   ```
-
-4. Link to your Supabase project:
-   ```bash
-   supabase link --project-ref your-project-ref
-   ```
-
-5. Run the migration:
-   ```bash
-   supabase db push
-   ```
-
-#### Option B: Manual Setup
-
-1. Go to your Supabase project dashboard
-2. Navigate to SQL Editor
-3. Copy and paste the contents of `supabase/migrations/001_initial_schema.sql`
-4. Run the SQL script
-
-#### Quick Fix if You Get Schema Errors
-
-If you get errors like "Could not find the 'application_date' column", it means the database schema hasn't been applied yet:
-
-1. **Manual Schema Setup** (Easiest):
-   - Go to your Supabase project dashboard
-   - Click **SQL Editor** in the sidebar
-   - Copy the entire contents of `supabase/migrations/001_initial_schema.sql`
-   - Paste it into the SQL editor and click **Run**
-
-2. **Verify Tables Created**:
-   - Go to **Table Editor** in Supabase dashboard
-   - You should see: `profiles`, `applications`, `reminders` tables
-
-3. **If tables exist but missing columns**:
-   ```sql
-   -- Run this in SQL Editor to check your schema
-   SELECT column_name, data_type 
-   FROM information_schema.columns 
-   WHERE table_name = 'applications';
-   ```
-
-### 3. Email System Setup
-
-#### Option A: Using Resend (Recommended)
-
-1. Sign up for [Resend](https://resend.com) and get your API key
-2. In your Supabase project dashboard, go to Settings → Edge Functions
-3. Add environment variable:
-   - `RESEND_API_KEY`: Your Resend API key
-   - `NEXT_PUBLIC_APP_URL`: Your app URL (e.g., `https://yourdomain.com` or `http://localhost:3000` for development)
-
-4. Deploy the Edge Functions:
-   ```bash
-   supabase functions deploy send-reminders
-   supabase functions deploy test-reminder
-   ```
-
-5. Set up a cron job (in Supabase Dashboard → Database → Cron):
-   ```sql
-   -- Run every hour to check for due reminders
-   SELECT cron.schedule(
-     'send-reminders',
-     '0 * * * *',
-     $$ SELECT net.http_post(
-         url := 'https://your-project-ref.supabase.co/functions/v1/send-reminders',
-         headers := '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb
-     ) $$
-   );
-   ```
-
-#### Option B: Alternative Email Providers
-
-You can modify the Edge Function to use other providers like SendGrid, Mailgun, or AWS SES by updating the email sending logic in `supabase/functions/send-reminders/index.ts`.
-
-### 4. Install Dependencies
+Run the database migration in your Supabase SQL Editor:
 
 ```bash
-npm install
+# Copy contents of supabase/migrations/001_initial_schema.sql
+# Paste and run in Supabase Dashboard > SQL Editor
 ```
 
-### 5. Run Development Server
+### 4. Email Configuration (Optional)
+
+1. Get your [Resend API key](https://resend.com)
+2. Add to Supabase Dashboard > Settings > Edge Functions:
+   - `RESEND_API_KEY`: Your Resend API key
+
+3. Deploy the email function:
+```bash
+supabase functions deploy send-reminders
+```
+
+### 5. Run the Application
 
 ```bash
 npm run dev
 ```
 
-## Testing Email Reminders
+Visit `http://localhost:3000` to start using InternHub!
 
-1. Create an application with a reminder set for the current time or past
-2. Click the "Test Email" button in the dashboard header
-3. Check your email for the reminder
-4. Check the application card - sent reminders will show as "Sent" (green), pending ones as "Pending" (yellow)
+## Project Structure
+
+```
+internhub/
+├── src/
+│   ├── app/                 # Next.js app directory
+│   │   ├── dashboard/       # Main application interface
+│   │   ├── login/          # Authentication pages
+│   │   └── globals.css     # Global styles with modern effects
+│   └── lib/                # Shared utilities and configurations
+├── supabase/
+│   ├── migrations/         # Database schema files
+│   └── functions/          # Edge functions for email system
+└── public/                 # Static assets
+```
 
 ## Database Schema
 
-The application uses three main tables:
+Three main tables power the application:
 
-- **profiles**: User profile information (extends Supabase auth.users)
-- **applications**: Internship applications with status tracking
-- **reminders**: Email reminders for follow-ups
+- **`profiles`**: User information extending Supabase auth
+- **`applications`**: Internship applications with status tracking  
+- **`reminders`**: Email reminders with scheduling
 
-All tables include Row Level Security (RLS) policies to ensure users can only access their own data.
+All tables use Row Level Security (RLS) for data protection.
 
-## Features
+## Deployment
 
-- ✅ User authentication (signup/login)
-- ✅ Application tracking with status updates
-- ✅ Bulk operations (status updates, reminders)
-- ✅ Analytics dashboard with charts
-- ✅ Email reminder system
-- ✅ Settings management
-- ✅ Responsive design
+### Vercel (Recommended)
 
-## Email System Features
+1. Push your code to GitHub
+2. Connect to [Vercel](https://vercel.com)
+3. Add environment variables in Vercel dashboard
+4. Deploy!
 
-- **Automated Reminders**: Set reminders for 1 week, 2 weeks, 3 weeks, 1 month, 2 months, or custom dates
-- **Beautiful HTML Emails**: Professional-looking emails with company branding
-- **Status Tracking**: See which reminders have been sent vs pending
-- **Flexible Email Options**: Use main email or separate reminder email
-- **Bulk Operations**: Set reminders for multiple applications at once
-- **Test Functionality**: Test email system with a button click
+### Other Platforms
+
+The app works on any platform supporting Next.js:
+- Netlify
+- Railway
+- DigitalOcean App Platform
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React 19, TypeScript
-- **Styling**: Tailwind CSS
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
-- **Email**: Resend API
-- **Background Jobs**: Supabase Edge Functions + Cron
+- **Styling**: Tailwind CSS with custom animations
 - **Charts**: Recharts
-- **Date Picker**: React DatePicker
+- **Email**: Resend API
+- **Deployment**: Vercel
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`
+3. Commit changes: `git commit -am 'Add feature'`
+4. Push to branch: `git push origin feature-name`
+5. Submit a pull request
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Support
+
+- [Issues](https://github.com/yourusername/internhub/issues)
+- [Discussions](https://github.com/yourusername/internhub/discussions)

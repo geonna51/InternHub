@@ -376,39 +376,7 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const testReminders = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('test-reminder')
-      if (error) {
-        console.error('Error testing reminders:', error)
-      } else {
-        console.log('Test reminder result:', data)
-        alert('Test reminder sent! Check console for details.')
-      }
-    } catch (error) {
-      console.error('Error invoking test reminder:', error)
-    }
-  };
 
-  const createTestReminder = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-test-reminder')
-      if (error) {
-        console.error('Error creating test reminder:', error)
-        alert('Error creating test reminder: ' + error.message)
-      } else {
-        console.log('Test reminder created:', data)
-        alert('Test reminder created! Now click "Test Email" to send it.')
-        // Reload applications to show the new test reminder
-        if (user) {
-          await loadApplications(user.id)
-        }
-      }
-    } catch (error) {
-      console.error('Error invoking create-test-reminder:', error)
-      alert('Error creating test reminder: ' + error)
-    }
-  };
 
   if (loading) {
     return (
@@ -447,44 +415,36 @@ export default function DashboardPage() {
 
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen px-6 py-8 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 right-20 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 left-20 w-72 h-72 bg-purple-500/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex items-center justify-between animate-fade-in">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
+            <h1 className="text-5xl font-black gradient-text mb-3 tracking-tight">
               Dashboard
             </h1>
-            <p className="text-gray-400">Welcome back, {profile?.email}</p>
+            <p className="text-gray-400 text-lg">Welcome back, <span className="text-white font-medium">{profile?.email}</span></p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={createTestReminder}
-              className="px-3 py-1 text-sm text-green-400 hover:text-green-300 transition-colors cursor-pointer"
-              title="Create Test Reminder"
-            >
-              Create Test
-            </button>
-            <button
-              onClick={testReminders}
-              className="px-3 py-1 text-sm text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
-              title="Test Reminders"
-            >
-              Test Email
-            </button>
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowSettings(true)}
-              className="p-2 text-gray-400 hover:text-gray-300 transition-colors cursor-pointer"
+              className="p-3 btn-glass rounded-xl text-gray-400 hover:text-gray-300 transition-smooth"
               title="Settings"
             >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             </button>
             <button
               onClick={handleLogout}
-              className="px-3 py-1 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+              className="px-4 py-2 text-sm btn-glass rounded-xl text-red-400 hover:text-red-300 transition-smooth"
               title="Logout"
             >
               Logout
@@ -493,15 +453,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="mb-8">
-          <nav className="flex space-x-8 border-b border-gray-700">
+        <div className="mb-8 animate-slide-up">
+          <nav className="glass-card rounded-2xl p-2 inline-flex gap-2">
             <button
               type="button"
               onClick={() => setActiveTab('add')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
+              className={`px-6 py-3 rounded-xl font-medium text-sm transition-smooth ${
                 activeTab === 'add'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
               Add Application
@@ -509,10 +469,10 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setActiveTab('list')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
+              className={`px-6 py-3 rounded-xl font-medium text-sm transition-smooth ${
                 activeTab === 'list'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
               My Applications ({applications.length})
@@ -520,10 +480,10 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setActiveTab('analytics')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
+              className={`px-6 py-3 rounded-xl font-medium text-sm transition-smooth ${
                 activeTab === 'analytics'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
               Analytics
@@ -533,45 +493,47 @@ export default function DashboardPage() {
 
         {/* Content */}
         {activeTab === 'add' ? (
-          <div className="max-w-2xl mx-auto">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="company" className="block text-sm font-medium text-gray-300 mb-2">
-                  Company Name
-                </label>
-                <input
-                  id="company"
-                  type="text"
-                  placeholder="Enter company name"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  required
-                />
-              </div>
+          <div className="max-w-2xl mx-auto animate-fade-in">
+            <div className="glass-card rounded-3xl p-8">
+              <h2 className="text-2xl font-semibold text-white mb-6">Add New Application</h2>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label htmlFor="company" className="block text-sm font-medium text-gray-300 mb-3">
+                    Company Name
+                  </label>
+                  <input
+                    id="company"
+                    type="text"
+                    placeholder="Enter company name"
+                    className="w-full px-5 py-4 glass rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-smooth"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    required
+                  />
+                </div>
 
-              <div>
-                <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-2">
-                  Application Date
-                </label>
-                <DatePicker
-                  selected={date}
-                  onChange={(date) => setDate(date)}
-                  dateFormat="MM/dd/yyyy"
-                  placeholderText="Select application date"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+                <div>
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-300 mb-3">
+                    Application Date
+                  </label>
+                  <DatePicker
+                    selected={date}
+                    onChange={(date) => setDate(date)}
+                    dateFormat="MM/dd/yyyy"
+                    placeholderText="Select application date"
+                    className="w-full px-5 py-4 glass rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-smooth"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Referral Received?
-                </label>
-                <select
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={referral.toString()}
-                  onChange={(e) => setReferral(e.target.value === 'true')}
-                >
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">
+                    Referral Received?
+                  </label>
+                  <select
+                    className="w-full px-5 py-4 glass rounded-xl text-white focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-smooth"
+                    value={referral.toString()}
+                    onChange={(e) => setReferral(e.target.value === 'true')}
+                  >
                   <option value="false">No</option>
                   <option value="true">Yes</option>
                 </select>
@@ -579,42 +541,43 @@ export default function DashboardPage() {
 
               {referral && (
                 <div>
-                  <label htmlFor="referredBy" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="referredBy" className="block text-sm font-medium text-gray-300 mb-3">
                     Referred By
                   </label>
                   <input
                     id="referredBy"
                     type="text"
                     placeholder="Who referred you?"
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-5 py-4 glass rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-smooth"
                     value={referredBy}
                     onChange={(e) => setReferredBy(e.target.value)}
                   />
                 </div>
               )}
 
-              <div>
-                <label htmlFor="applicationLink" className="block text-sm font-medium text-gray-300 mb-2">
-                  Application Link <span className="text-gray-500">(optional)</span>
-                </label>
-                <input
-                  id="applicationLink"
-                  type="url"
-                  placeholder="https://company.com/careers/job-id"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={applicationLink}
-                  onChange={(e) => setApplicationLink(e.target.value)}
-                />
-              </div>
+                <div>
+                  <label htmlFor="applicationLink" className="block text-sm font-medium text-gray-300 mb-3">
+                    Application Link <span className="text-gray-500">(optional)</span>
+                  </label>
+                  <input
+                    id="applicationLink"
+                    type="url"
+                    placeholder="https://company.com/careers/job-id"
+                    className="w-full px-5 py-4 glass rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-smooth"
+                    value={applicationLink}
+                    onChange={(e) => setApplicationLink(e.target.value)}
+                  />
+                </div>
 
-              <button
-                type="submit"
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={submitting || !company.trim()}
-              >
-                {submitting ? 'Adding...' : 'Add Application'}
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="w-full px-6 py-4 btn-glass rounded-xl font-semibold text-white transition-smooth disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
+                  disabled={submitting || !company.trim()}
+                >
+                  {submitting ? 'Adding...' : 'Add Application'}
+                </button>
+              </form>
+            </div>
           </div>
         ) : activeTab === 'list' ? (
           <div>
@@ -774,10 +737,10 @@ export default function DashboardPage() {
                 {applications.map((app, idx) => (
                    <div 
                      key={idx} 
-                     className={`bg-gray-800 border rounded-lg p-6 cursor-pointer transition-all ${
+                     className={`glass-card rounded-2xl p-6 cursor-pointer transition-smooth hover:scale-[1.02] ${
                        selectedApps.includes(idx) 
-                         ? 'border-blue-500 bg-gray-750' 
-                         : 'border-gray-700 hover:border-gray-600'
+                         ? 'border-blue-500/50 bg-blue-500/10' 
+                         : 'hover:bg-white/5'
                      }`}
                      onClick={() => toggleAppSelection(idx)}
                    >
@@ -884,8 +847,8 @@ export default function DashboardPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-medium text-gray-300 mb-2">No data to analyze yet</h3>
-                <p className="text-gray-400 mb-4">Add some applications to see your analytics and insights.</p>
+                <h3 className="text-lg font-medium text-gray-300 mb-2">Nothing here yet</h3>
+                <p className="text-gray-400 mb-4">Add your first application to see your progress.</p>
                 <button
                   onClick={() => setActiveTab('add')}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -896,8 +859,8 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-8">
                 {/* Application Pipeline Overview */}
-                <div className="bg-gray-800 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-white mb-6">Application Pipeline</h3>
+                <div className="glass-card rounded-3xl p-8 animate-fade-in">
+                  <h3 className="text-2xl font-semibold text-white mb-8">Application Pipeline</h3>
                   
                   {/* Pipeline stages */}
                   {(() => {
@@ -983,8 +946,8 @@ export default function DashboardPage() {
                 </div>
                 
                 {/* Status Distribution */}
-                <div className="bg-gray-800 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Status Distribution</h3>
+                <div className="glass-card rounded-3xl p-8 animate-slide-up">
+                  <h3 className="text-2xl font-semibold text-white mb-6">Status Distribution</h3>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -1030,27 +993,27 @@ export default function DashboardPage() {
 
                 {/* Quick Stats */}
                 <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-gray-800 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-400">{applications.length}</div>
-                    <div className="text-sm text-gray-400">Total Applications</div>
+                  <div className="glass-card rounded-2xl p-6 text-center transition-smooth hover:scale-105">
+                    <div className="text-3xl font-bold text-blue-400">{applications.length}</div>
+                    <div className="text-sm text-gray-400 mt-2">Total Applications</div>
                   </div>
-                  <div className="bg-gray-800 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-green-400">
+                  <div className="glass-card rounded-2xl p-6 text-center transition-smooth hover:scale-105">
+                    <div className="text-3xl font-bold text-green-400">
                       {applications.filter(app => app.status === 'offer').length}
                     </div>
-                    <div className="text-sm text-gray-400">Offers Received</div>
+                    <div className="text-sm text-gray-400 mt-2">Offers Received</div>
                   </div>
-                  <div className="bg-gray-800 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-400">
+                  <div className="glass-card rounded-2xl p-6 text-center transition-smooth hover:scale-105">
+                    <div className="text-3xl font-bold text-yellow-400">
                       {applications.filter(app => ['under-review', 'online-assessment', 'phone-screen', 'technical-interview', 'final-interview'].includes(app.status)).length}
                     </div>
-                    <div className="text-sm text-gray-400">In Progress</div>
+                    <div className="text-sm text-gray-400 mt-2">In Progress</div>
                   </div>
-                  <div className="bg-gray-800 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-purple-400">
+                  <div className="glass-card rounded-2xl p-6 text-center transition-smooth hover:scale-105">
+                    <div className="text-3xl font-bold text-purple-400">
                       {applications.filter(app => app.referral).length}
                     </div>
-                    <div className="text-sm text-gray-400">With Referrals</div>
+                    <div className="text-sm text-gray-400 mt-2">With Referrals</div>
                   </div>
                 </div>
               </div>
