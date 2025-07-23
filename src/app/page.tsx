@@ -11,7 +11,7 @@ export default function Home() {
           Track every application, deadline, and interview in a single place — so you can focus on landing the offer.
         </p>
         <Link href="/login" className="inline-block">
-          <button className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-medium">
+          <button className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-medium cursor-pointer">
             Get Started
           </button>
         </Link>

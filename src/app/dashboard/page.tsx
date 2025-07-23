@@ -263,6 +263,69 @@ export default function DashboardPage() {
     setShowStatusPanel(false);
   };
 
+  const deleteSelectedApplications = async () => {
+    if (!user || selectedApps.length === 0) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedApps.length} application(s)? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const applicationsToDelete = selectedApps.map(index => applications[index].id);
+      
+      const { error } = await supabase
+        .from('applications')
+        .delete()
+        .in('id', applicationsToDelete);
+
+      if (error) {
+        console.error('Error deleting applications:', error);
+        alert('Error deleting applications: ' + error.message);
+        return;
+      }
+
+      // Reload applications
+      await loadApplications(user.id);
+      alert(`Successfully deleted ${selectedApps.length} application(s)`);
+    } catch (error) {
+      console.error('Error deleting applications:', error);
+      alert('Error deleting applications: ' + error);
+    }
+    
+    setSelectedApps([]);
+  };
+
+  const deleteSingleApplication = async (applicationId: string, companyName: string) => {
+    if (!user) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the application for ${companyName}? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .delete()
+        .eq('id', applicationId);
+
+      if (error) {
+        console.error('Error deleting application:', error);
+        alert('Error deleting application: ' + error.message);
+        return;
+      }
+
+      // Reload applications
+      await loadApplications(user.id);
+    } catch (error) {
+      console.error('Error deleting application:', error);
+      alert('Error deleting application: ' + error);
+    }
+  };
+
   const getStatusInfo = (status: string) => {
     return statusOptions.find(option => option.value === status) || statusOptions[0];
   };
@@ -327,6 +390,26 @@ export default function DashboardPage() {
     }
   };
 
+  const createTestReminder = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-test-reminder')
+      if (error) {
+        console.error('Error creating test reminder:', error)
+        alert('Error creating test reminder: ' + error.message)
+      } else {
+        console.log('Test reminder created:', data)
+        alert('Test reminder created! Now click "Test Email" to send it.')
+        // Reload applications to show the new test reminder
+        if (user) {
+          await loadApplications(user.id)
+        }
+      }
+    } catch (error) {
+      console.error('Error invoking create-test-reminder:', error)
+      alert('Error creating test reminder: ' + error)
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -340,90 +423,28 @@ export default function DashboardPage() {
 
   // Analytics data preparation
   const getStatusCounts = () => {
+    // Color mapping for chart colors (hex values)
+    const colorMap: { [key: string]: string } = {
+      'bg-blue-500': '#3B82F6',
+      'bg-yellow-500': '#EAB308', 
+      'bg-purple-500': '#A855F7',
+      'bg-indigo-500': '#6366F1',
+      'bg-cyan-500': '#06B6D4',
+      'bg-orange-500': '#F97316',
+      'bg-green-500': '#10B981',
+      'bg-red-500': '#EF4444',
+      'bg-gray-500': '#6B7280',
+    };
+
     const counts = statusOptions.map(status => ({
       name: status.label,
       value: applications.filter(app => app.status === status.value).length,
-      color: status.color.replace('bg-', '#').replace('-500', ''),
+      color: colorMap[status.color] || '#6B7280',
     }));
     return counts.filter(item => item.value > 0);
   };
 
-  const getMonthlyApplications = () => {
-    const monthCounts: { [key: string]: number } = {};
-    applications.forEach(app => {
-      if (app.application_date) {
-        const month = app.application_date.split('-')[1]; // YYYY-MM-DD -> MM
-        monthCounts[month] = (monthCounts[month] || 0) + 1;
-      }
-    });
-    return Object.entries(monthCounts).map(([month, count]) => ({ month, count }));
-  };
 
-  const getSankeyData = () => {
-    // Create flow data for Sankey diagram
-    const flows = [
-      { from: 'Total Applications', to: 'Applied', value: applications.length },
-    ];
-    
-    const statusCounts = applications.reduce((acc, app) => {
-      acc[app.status] = (acc[app.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Add flows from Applied to other statuses
-    Object.entries(statusCounts).forEach(([status, count]) => {
-      if (status !== 'applied') {
-        const statusInfo = statusOptions.find(s => s.value === status);
-        if (statusInfo) {
-          flows.push({ from: 'Applied', to: statusInfo.label, value: count });
-        }
-      }
-    });
-
-    return flows;
-  };
-
-  const renderSankeyDiagram = () => {
-    const flows = getSankeyData();
-    const totalApps = applications.length;
-    
-    if (totalApps === 0) {
-      return (
-        <div className="text-center py-12 text-gray-400">
-          <p>Add some applications to see the flow diagram</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-gray-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Application Flow</h3>
-        <div className="space-y-4">
-          {flows.map((flow, idx) => (
-            <div key={idx} className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm">
-                  {flow.from}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-0.5 bg-gray-600"></div>
-                  <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="bg-green-600 text-white px-3 py-1 rounded text-sm">
-                  {flow.to}
-                </div>
-              </div>
-              <div className="text-gray-300 font-semibold">
-                {flow.value} ({Math.round((flow.value / totalApps) * 100)}%)
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen px-6 py-8">
@@ -437,6 +458,13 @@ export default function DashboardPage() {
             <p className="text-gray-400">Welcome back, {profile?.email}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={createTestReminder}
+              className="px-3 py-1 text-sm text-green-400 hover:text-green-300 transition-colors cursor-pointer"
+              title="Create Test Reminder"
+            >
+              Create Test
+            </button>
             <button
               onClick={testReminders}
               className="px-3 py-1 text-sm text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
@@ -630,18 +658,33 @@ export default function DashboardPage() {
                         </button>
                       </div>
                       {selectedApps.length > 0 && (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <button
                             onClick={() => setShowStatusPanel(!showStatusPanel)}
-                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
+                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors cursor-pointer flex items-center gap-2"
                           >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             Update Status ({selectedApps.length})
                           </button>
                           <button
                             onClick={() => setShowReminderPanel(!showReminderPanel)}
-                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors cursor-pointer flex items-center gap-2"
                           >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             Set Reminders ({selectedApps.length})
+                          </button>
+                          <button
+                            onClick={deleteSelectedApplications}
+                            className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors cursor-pointer flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete ({selectedApps.length})
                           </button>
                         </div>
                       )}
@@ -650,14 +693,25 @@ export default function DashboardPage() {
                     {/* Status Update Panel */}
                     {showStatusPanel && (
                       <div className="mt-4 pt-4 border-t border-gray-600">
-                        <h4 className="text-sm font-medium text-gray-300 mb-3">Update status for selected applications:</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-sm font-medium text-gray-300">Update status for {selectedApps.length} selected application{selectedApps.length !== 1 ? 's' : ''}:</h4>
+                          <button
+                            onClick={() => setShowStatusPanel(false)}
+                            className="text-gray-400 hover:text-gray-300 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                           {statusOptions.map((status) => (
                             <button
                               key={status.value}
                               onClick={() => updateStatusForSelected(status.value)}
-                              className={`px-3 py-2 text-xs text-white rounded transition-opacity hover:opacity-80 ${status.color}`}
+                              className={`px-4 py-3 text-sm text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg ${status.color} flex items-center justify-center gap-2 font-medium`}
                             >
+                              <div className="w-2 h-2 rounded-full bg-white opacity-75"></div>
                               {status.label}
                             </button>
                           ))}
@@ -762,9 +816,23 @@ export default function DashboardPage() {
                            </div>
                          </div>
                        </div>
-                       <span className="text-xs text-gray-400">
-                         #{idx + 1}
-                       </span>
+                       <div className="flex items-center gap-2">
+                         <button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             deleteSingleApplication(app.id, app.company);
+                           }}
+                           className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
+                           title={`Delete ${app.company} application`}
+                         >
+                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                           </svg>
+                         </button>
+                         <span className="text-xs text-gray-400">
+                           #{idx + 1}
+                         </span>
+                       </div>
                      </div>
                      <div className="space-y-2 text-sm">
                        <div className="flex justify-between">
@@ -827,9 +895,73 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="grid gap-8 lg:grid-cols-2">
-                {/* Application Flow Sankey */}
+                {/* Application Pipeline Overview */}
                 <div className="lg:col-span-2">
-                  {renderSankeyDiagram()}
+                  <div className="bg-gray-800 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-white mb-6">Application Pipeline</h3>
+                    
+                    {/* Pipeline stages */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
+                      {[
+                        { key: 'applied', label: 'Applied', color: '#3B82F6', icon: '📝' },
+                        { key: 'under-review', label: 'Under Review', color: '#EAB308', icon: '👀' },
+                        { key: 'online-assessment', label: 'Assessment', color: '#A855F7', icon: '💻' },
+                        { key: 'phone-screen', label: 'Phone Screen', color: '#6366F1', icon: '📞' },
+                        { key: 'technical-interview', label: 'Technical', color: '#06B6D4', icon: '🧑‍💻' },
+                        { key: 'final-interview', label: 'Final Round', color: '#F97316', icon: '🎯' },
+                        { key: 'offer', label: 'Offer', color: '#10B981', icon: '🎉' },
+                        { key: 'rejected', label: 'Rejected', color: '#EF4444', icon: '❌' },
+                        { key: 'withdrawn', label: 'Withdrawn', color: '#6B7280', icon: '↩️' }
+                      ].map((stage) => {
+                        const count = applications.filter(app => app.status === stage.key).length;
+                        const percentage = applications.length > 0 ? Math.round((count / applications.length) * 100) : 0;
+                        
+                        if (count === 0) return null;
+                        
+                        return (
+                          <div key={stage.key} className="text-center">
+                            <div 
+                              className="w-16 h-16 mx-auto rounded-lg flex items-center justify-center text-white font-bold text-lg mb-2"
+                              style={{ backgroundColor: stage.color }}
+                            >
+                              <span className="text-xl">{stage.icon}</span>
+                            </div>
+                            <div className="text-white font-semibold text-lg">{count}</div>
+                            <div className="text-xs text-gray-400 mb-1">{stage.label}</div>
+                            <div className="text-xs text-gray-500">{percentage}%</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Quick stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-700">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-400">
+                          {Math.round((applications.filter(app => app.status === 'offer').length / Math.max(applications.length, 1)) * 100)}%
+                        </div>
+                        <div className="text-sm text-gray-400">Success Rate</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-400">
+                          {Math.round((applications.filter(app => ['technical-interview', 'final-interview'].includes(app.status)).length / Math.max(applications.length, 1)) * 100)}%
+                        </div>
+                        <div className="text-sm text-gray-400">Interview Rate</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-400">
+                          {Math.round((applications.filter(app => ['online-assessment', 'phone-screen'].includes(app.status)).length / Math.max(applications.length, 1)) * 100)}%
+                        </div>
+                        <div className="text-sm text-gray-400">Assessment Rate</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-400">
+                          {Math.round((applications.filter(app => app.status === 'rejected').length / Math.max(applications.length, 1)) * 100)}%
+                        </div>
+                        <div className="text-sm text-gray-400">Rejection Rate</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
                 {/* Status Distribution */}
@@ -845,37 +977,99 @@ export default function DashboardPage() {
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
-                          label
+                          label={(entry) => `${entry.name}: ${entry.value}`}
                         >
                           {getStatusCounts().map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Monthly Applications */}
-                <div className="bg-gray-800 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Applications Over Time</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={getMonthlyApplications()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                        <XAxis dataKey="month" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" />
                         <Tooltip 
                           contentStyle={{ 
                             backgroundColor: '#1F2937', 
                             border: '1px solid #374151',
-                            borderRadius: '8px'
+                            borderRadius: '6px',
+                            color: '#F3F4F6'
                           }}
                         />
-                        <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                      </BarChart>
+                      </PieChart>
                     </ResponsiveContainer>
+                  </div>
+                  {/* Legend */}
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {getStatusCounts().map((entry, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: entry.color }}
+                        ></div>
+                        <span className="text-sm text-gray-300">
+                          {entry.name} ({entry.value})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Success Metrics */}
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Success Metrics</h3>
+                  <div className="space-y-6">
+                    {/* Key metrics */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-700/50 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-green-400">
+                          {applications.filter(app => app.status === 'offer').length}
+                        </div>
+                        <div className="text-sm text-gray-400">Offers Received</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {applications.length > 0 ? 
+                            Math.round((applications.filter(app => app.status === 'offer').length / applications.length) * 100) : 0}% success rate
+                        </div>
+                      </div>
+                      <div className="bg-gray-700/50 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-blue-400">
+                          {applications.filter(app => 
+                            ['technical-interview', 'final-interview'].includes(app.status)
+                          ).length}
+                        </div>
+                        <div className="text-sm text-gray-400">In Interviews</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {applications.length > 0 ? 
+                            Math.round((applications.filter(app => 
+                              ['technical-interview', 'final-interview'].includes(app.status)
+                            ).length / applications.length) * 100) : 0}% interview rate
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress breakdown */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-gray-300">Application Progress</h4>
+                      {[
+                        { label: 'Early Stage', statuses: ['applied', 'under-review'], color: '#3B82F6' },
+                        { label: 'Assessments', statuses: ['online-assessment', 'phone-screen'], color: '#A855F7' },
+                        { label: 'Interviews', statuses: ['technical-interview', 'final-interview'], color: '#F97316' },
+                        { label: 'Final Outcomes', statuses: ['offer', 'rejected', 'withdrawn'], color: '#6B7280' }
+                      ].map((category, idx) => {
+                        const count = applications.filter(app => category.statuses.includes(app.status)).length;
+                        const percentage = applications.length > 0 ? (count / applications.length) * 100 : 0;
+                        return (
+                          <div key={idx} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: category.color }}
+                              ></div>
+                              <span className="text-sm text-gray-300">{category.label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm text-white font-medium">{count}</div>
+                              <div className="text-xs text-gray-400">({Math.round(percentage)}%)</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 

@@ -7,11 +7,14 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('🚀 send-reminders function started')
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    console.log('📊 Initializing Supabase client...')
     // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -23,6 +26,7 @@ serve(async (req) => {
     const nowISO = now.toISOString()
 
     // Find reminders that are due and haven't been sent
+    console.log('🔍 Querying for due reminders...')
     const { data: dueReminders, error: reminderError } = await supabaseClient
       .from('reminders')
       .select(`
@@ -39,6 +43,11 @@ serve(async (req) => {
       `)
       .lte('reminder_date', nowISO)
       .eq('email_sent', false)
+    
+    console.log('📋 Reminders query result:', { 
+      foundReminders: dueReminders?.length || 0, 
+      error: reminderError 
+    })
 
     if (reminderError) {
       console.error('Error fetching reminders:', reminderError)
@@ -49,6 +58,7 @@ serve(async (req) => {
     }
 
     if (!dueReminders || dueReminders.length === 0) {
+      console.log('✅ No reminders due at this time')
       return new Response(
         JSON.stringify({ message: 'No reminders due', count: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -56,27 +66,33 @@ serve(async (req) => {
     }
 
     // Initialize Resend
+    console.log('🔑 Checking for RESEND_API_KEY...')
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     if (!RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY not found in environment variables')
       throw new Error('RESEND_API_KEY not configured')
     }
+    console.log('✅ RESEND_API_KEY found:', RESEND_API_KEY.substring(0, 10) + '...')
 
     let emailsSent = 0
     const errors: string[] = []
 
     // Process each reminder
+    console.log(`📧 Processing ${dueReminders.length} reminders...`)
     for (const reminder of dueReminders) {
       try {
+        console.log(`🔄 Processing reminder ID: ${reminder.id}`)
         const application = reminder.applications
         const profile = reminder.profiles
         
         if (!application || !profile) {
-          console.error('Missing application or profile data for reminder:', reminder.id)
+          console.error('❌ Missing application or profile data for reminder:', reminder.id)
           continue
         }
 
         // Determine which email to use
         const recipientEmail = profile.reminder_email || profile.email
+        console.log(`📮 Recipient email: ${recipientEmail} (company: ${application.company})`)
 
         // Create email content
         const emailSubject = `InternHub Reminder: Follow up on ${application.company}`
@@ -84,6 +100,7 @@ serve(async (req) => {
         const emailText = generateEmailText(application, reminder)
 
         // Send email using Resend
+        console.log(`📤 Sending email to ${recipientEmail} for reminder ${reminder.id}...`)
         const emailResponse = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -91,7 +108,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'InternHub <noreply@internhub.app>',
+            from: 'InternHub <onboarding@resend.dev>',
             to: [recipientEmail],
             subject: emailSubject,
             html: emailHtml,
@@ -99,12 +116,17 @@ serve(async (req) => {
           }),
         })
 
+        console.log(`📡 Email API response status: ${emailResponse.status}`)
+        
         if (!emailResponse.ok) {
           const errorData = await emailResponse.text()
-          console.error(`Failed to send email for reminder ${reminder.id}:`, errorData)
+          console.error(`❌ Failed to send email for reminder ${reminder.id}:`, errorData)
           errors.push(`Reminder ${reminder.id}: ${errorData}`)
           continue
         }
+
+        const successData = await emailResponse.json()
+        console.log(`✅ Email sent successfully for reminder ${reminder.id}:`, successData)
 
         // Mark reminder as sent
         const { error: updateError } = await supabaseClient
@@ -122,10 +144,12 @@ serve(async (req) => {
         console.log(`Successfully sent reminder for ${application.company} to ${recipientEmail}`)
 
       } catch (error) {
-        console.error(`Error processing reminder ${reminder.id}:`, error)
+        console.error(`❌ Error processing reminder ${reminder.id}:`, error)
         errors.push(`Reminder ${reminder.id}: ${error.message}`)
       }
     }
+    
+    console.log(`📊 Email processing complete. Sent: ${emailsSent}, Errors: ${errors.length}`)
 
     return new Response(
       JSON.stringify({
@@ -137,7 +161,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error in send-reminders function:', error)
+    console.error('💥 Critical error in send-reminders function:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
