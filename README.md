@@ -50,6 +50,28 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 3. Copy and paste the contents of `supabase/migrations/001_initial_schema.sql`
 4. Run the SQL script
 
+#### Quick Fix if You Get Schema Errors
+
+If you get errors like "Could not find the 'application_date' column", it means the database schema hasn't been applied yet:
+
+1. **Manual Schema Setup** (Easiest):
+   - Go to your Supabase project dashboard
+   - Click **SQL Editor** in the sidebar
+   - Copy the entire contents of `supabase/migrations/001_initial_schema.sql`
+   - Paste it into the SQL editor and click **Run**
+
+2. **Verify Tables Created**:
+   - Go to **Table Editor** in Supabase dashboard
+   - You should see: `profiles`, `applications`, `reminders` tables
+
+3. **If tables exist but missing columns**:
+   ```sql
+   -- Run this in SQL Editor to check your schema
+   SELECT column_name, data_type 
+   FROM information_schema.columns 
+   WHERE table_name = 'applications';
+   ```
+
 ### 3. Email System Setup
 
 #### Option A: Using Resend (Recommended)

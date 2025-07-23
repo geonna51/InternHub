@@ -19,9 +19,10 @@ export default function DashboardPage() {
   const supabase = createClient();
   
   // User state
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   
   // Form state
   const [company, setCompany] = useState('');
@@ -58,46 +59,46 @@ export default function DashboardPage() {
 
   // Load user and data on mount
   useEffect(() => {
-    loadUserAndData();
-  }, []);
-
-  const loadUserAndData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        router.push('/login');
-        return;
+    const loadData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+        
+        setUser({ id: user.id, email: user.email || '' });
+        
+        // Load profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileData) {
+          setProfile(profileData);
+          setSettings({
+            email: profileData.email,
+            reminderEmail: profileData.reminder_email || '',
+            newPassword: '',
+            confirmPassword: ''
+          });
+        }
+        
+        // Load applications
+        await loadApplications(user.id);
+        
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setUser(user);
-      
-      // Load profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (profileData) {
-        setProfile(profileData);
-        setSettings({
-          email: profileData.email,
-          reminderEmail: profileData.reminder_email || '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-      }
-      
-      // Load applications
-      await loadApplications(user.id);
-      
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    
+    loadData();
+  }, [router, supabase]);
 
   const loadApplications = async (userId: string) => {
     const { data: applicationsData, error } = await supabase
@@ -118,11 +119,13 @@ export default function DashboardPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted!', { company, date, referral, referredBy, applicationLink });
     
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
+      setSubmitting(true);
+      const { error } = await supabase
         .from('applications')
         .insert({
           user_id: user.id,
@@ -139,9 +142,11 @@ export default function DashboardPage() {
 
       if (error) {
         console.error('Error creating application:', error);
+        alert('Error creating application: ' + error.message);
         return;
       }
 
+      console.log('Application created successfully!');
       // Reload applications
       await loadApplications(user.id);
       
@@ -154,6 +159,9 @@ export default function DashboardPage() {
       setActiveTab('list');
     } catch (error) {
       console.error('Error submitting application:', error);
+      alert('Error submitting application: ' + error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -291,8 +299,8 @@ export default function DashboardPage() {
         }
       }
 
-      // Reload profile
-      await loadUserAndData();
+      // Reload applications to refresh data
+      await loadApplications(user.id);
     } catch (error) {
       console.error('Error updating settings:', error);
     }
@@ -431,14 +439,14 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={testReminders}
-              className="px-3 py-1 text-sm text-yellow-400 hover:text-yellow-300 transition-colors"
+              className="px-3 py-1 text-sm text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
               title="Test Reminders"
             >
               Test Email
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              className="p-2 text-gray-400 hover:text-gray-300 transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-300 transition-colors cursor-pointer"
               title="Settings"
             >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -448,7 +456,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={handleLogout}
-              className="px-3 py-1 text-sm text-red-400 hover:text-red-300 transition-colors"
+              className="px-3 py-1 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
               title="Logout"
             >
               Logout
@@ -462,7 +470,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setActiveTab('add')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === 'add'
                   ? 'border-blue-500 text-blue-400'
                   : 'border-transparent text-gray-400 hover:text-gray-300'
@@ -473,7 +481,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setActiveTab('list')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === 'list'
                   ? 'border-blue-500 text-blue-400'
                   : 'border-transparent text-gray-400 hover:text-gray-300'
@@ -484,7 +492,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setActiveTab('analytics')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors cursor-pointer ${
                 activeTab === 'analytics'
                   ? 'border-blue-500 text-blue-400'
                   : 'border-transparent text-gray-400 hover:text-gray-300'
@@ -573,9 +581,10 @@ export default function DashboardPage() {
 
               <button
                 type="submit"
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting || !company.trim()}
               >
-                Add Application
+                {submitting ? 'Adding...' : 'Add Application'}
               </button>
             </form>
           </div>
@@ -609,13 +618,13 @@ export default function DashboardPage() {
                         </span>
                         <button
                           onClick={selectAllApps}
-                          className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                          className="text-xs text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
                         >
                           Select All
                         </button>
                         <button
                           onClick={clearSelection}
-                          className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                          className="text-xs text-gray-400 hover:text-gray-300 transition-colors cursor-pointer"
                         >
                           Clear
                         </button>
@@ -624,13 +633,13 @@ export default function DashboardPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowStatusPanel(!showStatusPanel)}
-                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
                           >
                             Update Status ({selectedApps.length})
                           </button>
                           <button
                             onClick={() => setShowReminderPanel(!showReminderPanel)}
-                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
                           >
                             Set Reminders ({selectedApps.length})
                           </button>
