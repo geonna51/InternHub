@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import DatePicker from 'react-datepicker';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { createClient } from '../../lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import type { Database } from '../../lib/database.types';
@@ -98,7 +98,7 @@ export default function DashboardPage() {
     };
     
     loadData();
-  }, [router, supabase]);
+  }, [router, supabase]); // loadApplications is not included because it's defined after this useEffect
 
   const loadApplications = async (userId: string) => {
     const { data: applicationsData, error } = await supabase
