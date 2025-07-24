@@ -1,138 +1,83 @@
 # InternHub
 
-A modern application tracking system for students managing their internship search. Stay organized, track your progress, and never miss a follow-up.
+**InternHub** is a simple, modern web app to help you organize, track, and manage your internship applications—all in one place.
 
-![InternHub Preview](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=InternHub+Preview)
+👉 **Try it live:**  
+[https://intern-hub-zeta.vercel.app/](https://intern-hub-zeta.vercel.app/)
+
+---
+
+## What is InternHub?
+
+InternHub is built for students who want to keep their internship search organized and stress-free. No more messy spreadsheets or sticky notes—just a clean dashboard for your applications, deadlines, and reminders.
+
+- **Track your applications** and their status
+- **Set reminders** for follow-ups and deadlines
+- **See your progress** with visual analytics
+- **Keep notes and links** for each opportunity
+
+---
 
 ## Features
 
-- **Application Tracking**: Organize all your applications with status updates and notes
-- **Analytics Dashboard**: Visualize your progress with interactive charts and metrics
-- **Email Reminders**: Automated follow-up reminders for applications
-- **Bulk Operations**: Update multiple applications and set reminders efficiently
-- **Modern UI**: Clean, responsive design with glassmorphism effects
-- **Secure**: User authentication and data protection with Supabase
+- **Dashboard:** See all your applications at a glance
+- **Status Pipeline:** Visualize where each application stands (applied, interview, offer, etc.)
+- **Reminders:** Get notified about follow-ups and deadlines
+- **Notes & Links:** Store important details for each application
+- **Analytics:** See your progress and stats
+- **Modern UI:** Clean, responsive, and easy to use
 
-## Quick Start
+---
 
-### Prerequisites
+## Want to Run It Yourself?
 
-- Node.js 18+ 
-- A Supabase account
-- A Resend account (for email features)
+If you want to run InternHub locally, here’s how:
 
-### 1. Clone and Install
+1. **Clone the repo:**
+   ```bash
+   git clone https://github.com/yourusername/internhub.git
+   cd internhub
+   ```
 
-```bash
-git clone https://github.com/yourusername/internhub.git
-cd internhub
-npm install
-```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-### 2. Environment Setup
+3. **Set up environment variables:**  
+   Create a `.env.local` file with your Supabase project info:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
 
-Create `.env.local`:
+4. **Set up the database:**  
+   - Go to your Supabase dashboard
+   - Open the SQL Editor
+   - Copy and run the SQL from `supabase/migrations/001_initial_schema.sql`
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
+5. **Start the app:**
+   ```bash
+   npm run dev
+   ```
+   Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### 3. Database Setup
-
-Run the database migration in your Supabase SQL Editor:
-
-```bash
-# Copy contents of supabase/migrations/001_initial_schema.sql
-# Paste and run in Supabase Dashboard > SQL Editor
-```
-
-### 4. Email Configuration (Optional)
-
-1. Get your [Resend API key](https://resend.com)
-2. Add to Supabase Dashboard > Settings > Edge Functions:
-   - `RESEND_API_KEY`: Your Resend API key
-
-3. Deploy the email function:
-```bash
-supabase functions deploy send-reminders
-```
-
-### 5. Run the Application
-
-```bash
-npm run dev
-```
-
-Visit `http://localhost:3000` to start using InternHub!
-
-## Project Structure
-
-```
-internhub/
-├── src/
-│   ├── app/                 # Next.js app directory
-│   │   ├── dashboard/       # Main application interface
-│   │   ├── login/          # Authentication pages
-│   │   └── globals.css     # Global styles with modern effects
-│   └── lib/                # Shared utilities and configurations
-├── supabase/
-│   ├── migrations/         # Database schema files
-│   └── functions/          # Edge functions for email system
-└── public/                 # Static assets
-```
-
-## Database Schema
-
-Three main tables power the application:
-
-- **`profiles`**: User information extending Supabase auth
-- **`applications`**: Internship applications with status tracking  
-- **`reminders`**: Email reminders with scheduling
-
-All tables use Row Level Security (RLS) for data protection.
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push your code to GitHub
-2. Connect to [Vercel](https://vercel.com)
-3. Add environment variables in Vercel dashboard
-4. Deploy!
-
-### Other Platforms
-
-The app works on any platform supporting Next.js:
-- Netlify
-- Railway
-- DigitalOcean App Platform
+---
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Styling**: Tailwind CSS with custom animations
-- **Charts**: Recharts
-- **Email**: Resend API
-- **Deployment**: Vercel
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
+- **Backend:** Supabase (Postgres, Auth, Edge Functions)
+- **Email:** Resend API (for reminders)
+- **Charts:** Recharts
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -am 'Add feature'`
-4. Push to branch: `git push origin feature-name`
-5. Submit a pull request
+---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT
 
-## Support
+---
 
-- [Issues](https://github.com/yourusername/internhub/issues)
-- [Discussions](https://github.com/yourusername/internhub/discussions)
+**Built by a student, for students.**
