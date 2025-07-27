@@ -2,7 +2,7 @@
 
 **InternHub** is a simple, modern web app to help you organize, track, and manage your internship applications—all in one place.
 
-👉 **Try it live:**  
+**Try it live:**  
 [https://intern-hub-zeta.vercel.app/](https://intern-hub-zeta.vercel.app/)
 
 ---
